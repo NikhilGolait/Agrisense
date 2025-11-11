@@ -12,13 +12,14 @@ const app = express();
 app.use(express.json());
 app.use(cors({ origin: "http://localhost:3000", credentials: true }));
 
-// ✅ MongoDB Connection
+// ✅ MongoDB Connection (Atlas)
+const mongoUri = process.env.MONGO_URI || "mongodb+srv://Agrisense:Agrisense%40123@agrisense.gxaxgcs.mongodb.net/agrisenseDB?retryWrites=true&w=majority";
 mongoose
-  .connect("mongodb://127.0.0.1:27017/agrisenseDB", {
+  .connect(mongoUri, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
-  .then(() => console.log("✅ MongoDB connected successfully"))
+  .then(() => console.log("✅ MongoDB Atlas connected successfully"))
   .catch((err) => console.error("❌ MongoDB connection error:", err.message));
 
 // ✅ Twilio Configuration
