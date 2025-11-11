@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "name": "project",
   "version": "0.1.0",
   "private": true,
@@ -40,5 +41,9 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+=======
+  "dependencies": {
+    "react-scripts": "^5.0.1"
+>>>>>>> 95b331a2 (Initial commit)
   }
 }
