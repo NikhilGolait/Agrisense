@@ -1,34 +1,36 @@
 import express from "express";
-import mongoose from "mongoose";
 import cors from "cors";
+import mongoose from "mongoose";
 import twilio from "twilio";
-import bodyParser from "body-parser"; // ✅ Added for reliable body parsing
-import User from "./models/User.js";
+import bodyParser from "body-parser"; // ✅ essential for Render
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
+import User from "./models/User.js";
 
 dotenv.config();
 
 const app = express();
 
-// ✅ Use both express and body-parser for maximum compatibility
-app.use(express.json());
+// ✅ Correct middleware order (important for Render)
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// ✅ CORS setup for Render + Netlify + local dev
+// ✅ CORS setup for Vercel frontend and localhost
 app.use(
   cors({
     origin: [
-      "https://agrisense17.netlify.app", // your frontend on Netlify
-      "http://localhost:3000",           // for local React testing
+      "https://agrisense17.vercel.app", // ⚙️ Your actual frontend domain (change if different)
+      "http://localhost:3000",
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
 
-// ✅ Debugging middleware (to verify req.body on Render)
+// ✅ Parse JSON after CORS
+app.use(express.json());
+
+// ✅ Log every request (for debugging)
 app.use((req, res, next) => {
   console.log(`🧾 [${req.method}] ${req.url}`);
   console.log("📦 Body:", req.body);
@@ -48,13 +50,13 @@ mongoose
   .then(() => console.log("✅ MongoDB Atlas connected successfully"))
   .catch((err) => console.error("❌ MongoDB connection error:", err.message));
 
-// ✅ Twilio Configuration
+// ✅ Twilio Config
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
 const client = twilio(accountSid, authToken);
 
-// ✅ Helper: Ensure +91 Format
+// ✅ Helper: Format phone to +91XXXXXXXXXX
 function formatPhone(phone) {
   if (!phone) return null;
   let clean = String(phone).replace(/[^\d]/g, "");
@@ -67,12 +69,12 @@ function formatPhone(phone) {
 
 // ✅ Root Route
 app.get("/", (req, res) => {
-  res.send("🚀 AgriSense Backend Running — Twilio, Mongo, and Auth Active!");
+  res.send("🚀 AgriSense Backend Running — Connected to Vercel Frontend!");
 });
 
-// ✅ Test Route (to verify body parsing)
-app.post("/api/test", (req, res) => {
-  console.log("✅ Test Route Body:", req.body);
+// ✅ Debug Route (to test request body)
+app.post("/api/test-login", (req, res) => {
+  console.log("✅ Test route hit. Body received:", req.body);
   res.json({ received: req.body });
 });
 
@@ -83,9 +85,10 @@ app.post("/api/send-sms", async (req, res) => {
     const smsBody = message || cropInfo;
 
     if (!phone || !smsBody) {
-      return res
-        .status(400)
-        .json({ success: false, error: "Phone number and message/cropInfo required" });
+      return res.status(400).json({
+        success: false,
+        error: "Phone number and message/cropInfo required",
+      });
     }
 
     const formattedPhone = formatPhone(phone);
@@ -132,9 +135,13 @@ app.post("/api/send-sms", async (req, res) => {
 // ✅ Signup Route
 app.post("/api/signup", async (req, res) => {
   try {
+    console.log("📥 Signup Request:", req.body);
     const { name, phone, password } = req.body;
     if (!name || !phone || !password)
-      return res.status(400).json({ success: false, error: "Name, phone and password required" });
+      return res.status(400).json({
+        success: false,
+        error: "Name, phone, and password required",
+      });
 
     const formatted = formatPhone(phone);
     if (!formatted)
@@ -162,9 +169,12 @@ app.post("/api/signup", async (req, res) => {
 app.post("/api/login", async (req, res) => {
   try {
     console.log("📥 Login Request Body:", req.body);
+
     const { phone, password } = req.body;
     if (!phone || !password)
-      return res.status(400).json({ success: false, error: "Phone and password required" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Phone and password required" });
 
     const formatted = formatPhone(phone);
     if (!formatted)
@@ -190,14 +200,15 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// ✅ Reset Password Route
+// ✅ Reset Password
 app.post("/api/reset-password", async (req, res) => {
   try {
     const { phone, newPassword } = req.body;
     if (!phone || !newPassword)
-      return res
-        .status(400)
-        .json({ success: false, error: "Phone and new password required" });
+      return res.status(400).json({
+        success: false,
+        error: "Phone and new password required",
+      });
 
     const formatted = formatPhone(phone);
     if (!formatted)
@@ -217,6 +228,7 @@ app.post("/api/reset-password", async (req, res) => {
   }
 });
 
+// ✅ Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running successfully on port ${PORT}`);
