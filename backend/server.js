@@ -2,7 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import twilio from "twilio";
-import bodyParser from "body-parser"; // ✅ Reliable body parsing
+import bodyParser from "body-parser"; // ✅ Added for reliable body parsing
 import User from "./models/User.js";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
@@ -11,24 +11,24 @@ dotenv.config();
 
 const app = express();
 
-// ✅ Use both express and body-parser for full compatibility (Render + Vercel)
+// ✅ Use both express and body-parser for maximum compatibility
 app.use(express.json());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// ✅ Allow requests from your frontend (Vercel) + localhost for testing
+// ✅ CORS setup for Render + Netlify + local dev
 app.use(
   cors({
     origin: [
-      "https://agrisense-frontend.vercel.app", // 🔹 your actual Vercel frontend domain
-      "http://localhost:3000",                 // for local React testing
+      "https://agrisense17.netlify.app", // your frontend on Netlify
+      "http://localhost:3000",           // for local React testing
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
 
-// ✅ Debug log middleware — helps confirm backend receives body
+// ✅ Debugging middleware (to verify req.body on Render)
 app.use((req, res, next) => {
   console.log(`🧾 [${req.method}] ${req.url}`);
   console.log("📦 Body:", req.body);
@@ -48,13 +48,13 @@ mongoose
   .then(() => console.log("✅ MongoDB Atlas connected successfully"))
   .catch((err) => console.error("❌ MongoDB connection error:", err.message));
 
-// ✅ Twilio Setup
+// ✅ Twilio Configuration
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
 const client = twilio(accountSid, authToken);
 
-// ✅ Phone formatter (+91 support)
+// ✅ Helper: Ensure +91 Format
 function formatPhone(phone) {
   if (!phone) return null;
   let clean = String(phone).replace(/[^\d]/g, "");
@@ -67,16 +67,16 @@ function formatPhone(phone) {
 
 // ✅ Root Route
 app.get("/", (req, res) => {
-  res.send("🚀 AgriSense Backend Active — Connected to Vercel Frontend!");
+  res.send("🚀 AgriSense Backend Running — Twilio, Mongo, and Auth Active!");
 });
 
-// ✅ Test Route — use for debugging (POST from Postman or frontend)
+// ✅ Test Route (to verify body parsing)
 app.post("/api/test", (req, res) => {
   console.log("✅ Test Route Body:", req.body);
   res.json({ received: req.body });
 });
 
-// ✅ Send SMS
+// ✅ Send SMS Route
 app.post("/api/send-sms", async (req, res) => {
   try {
     const { phone, message, cropInfo } = req.body;
