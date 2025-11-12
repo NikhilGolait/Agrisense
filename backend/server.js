@@ -2,6 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import twilio from "twilio";
+import bodyParser from "body-parser"; // ✅ Added for reliable body parsing
 import User from "./models/User.js";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
@@ -10,26 +11,26 @@ dotenv.config();
 
 const app = express();
 
-// ✅ MUST come first — ensures backend parses JSON
+// ✅ Use both express and body-parser for maximum compatibility
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// ✅ CORS setup — allow your Netlify frontend
+// ✅ CORS setup for Render + Netlify + local dev
 app.use(
   cors({
     origin: [
-      "https://agrisense17.netlify.app", // Netlify frontend
-      "http://localhost:3000", // local dev
-      "http://localhost:5000",
+      "https://agrisense17.netlify.app", // your frontend on Netlify
+      "http://localhost:3000",           // for local React testing
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
 
-// ✅ Debugging middleware (optional — helps verify req.body)
+// ✅ Debugging middleware (to verify req.body on Render)
 app.use((req, res, next) => {
-  console.log("🧾 Incoming Request:", req.method, req.url);
+  console.log(`🧾 [${req.method}] ${req.url}`);
   console.log("📦 Body:", req.body);
   next();
 });
@@ -64,9 +65,15 @@ function formatPhone(phone) {
   return null;
 }
 
-// ✅ Root
+// ✅ Root Route
 app.get("/", (req, res) => {
-  res.send("🚀 AgriSense Backend Running — Twilio & Mongo Connected!");
+  res.send("🚀 AgriSense Backend Running — Twilio, Mongo, and Auth Active!");
+});
+
+// ✅ Test Route (to verify body parsing)
+app.post("/api/test", (req, res) => {
+  console.log("✅ Test Route Body:", req.body);
+  res.json({ received: req.body });
 });
 
 // ✅ Send SMS Route
@@ -111,7 +118,8 @@ app.post("/api/send-sms", async (req, res) => {
     let reason = err.message;
 
     if (reason.includes("unverified"))
-      reason = "Your Twilio account is in trial mode — please verify this number in Twilio console.";
+      reason =
+        "Your Twilio account is in trial mode — please verify this number in Twilio console.";
     else if (reason.includes("Permission"))
       reason = "Twilio permission denied for sending to this destination.";
     else if (reason.includes("From"))
@@ -153,9 +161,8 @@ app.post("/api/signup", async (req, res) => {
 // ✅ Login Route
 app.post("/api/login", async (req, res) => {
   try {
-    const { phone, password } = req.body;
     console.log("📥 Login Request Body:", req.body);
-
+    const { phone, password } = req.body;
     if (!phone || !password)
       return res.status(400).json({ success: false, error: "Phone and password required" });
 
