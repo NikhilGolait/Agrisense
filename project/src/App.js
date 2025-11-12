@@ -219,7 +219,8 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [suitableCrops, setSuitableCrops] = useState([]);
   const [fertilizerInfo, setFertilizerInfo] = useState([]);
-  // const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+
   const [showSmsCard, setShowSmsCard] = useState(false);
   const [phone, setPhone] = useState("");
   const [sending, setSending] = useState(false);
@@ -588,6 +589,21 @@ export default function App() {
             </div>
           </div>
         </header>
+
+        {/* Loading Indicator */}
+        {loading && (
+          <div style={{
+            textAlign: "center",
+            padding: "20px",
+            background: "#f0f8ff",
+            borderRadius: "8px",
+            margin: "15px 0",
+            fontSize: "16px",
+            color: "#1976d2"
+          }}>
+            ⏳ Loading weather data...
+          </div>
+        )}
 
         {/* 📱 SMS Popup */}
         <AnimatePresence>

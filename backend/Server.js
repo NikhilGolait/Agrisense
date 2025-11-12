@@ -10,7 +10,14 @@ dotenv.config();
 
 const app = express();
 app.use(express.json());
-app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+app.use(cors({ 
+  origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : [
+    "http://localhost:3000",
+    "http://localhost:5000",
+    "https://agrisense-17.onrender.com"
+  ],
+  credentials: true 
+}));
 
 // ✅ MongoDB Connection (Atlas)
 const mongoUri = process.env.MONGO_URI || "mongodb+srv://Agrisense:Agrisense%40123@agrisense.gxaxgcs.mongodb.net/agrisenseDB?retryWrites=true&w=majority";
