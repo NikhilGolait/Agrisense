@@ -16,7 +16,7 @@ export default function Login({ onSignupClick, onLoginSuccess }) {
     setMessage("");
     try {
       setLoading(true);
-      const res = await axios.post("http://localhost:5000/api/login", { phone, password });
+      const res = await axios.post("https://agrisense-17.onrender.com/api/login", { phone, password });
       if (res.data.success) {
         setMessage("✅ Login successful");
         const user = res.data.user;

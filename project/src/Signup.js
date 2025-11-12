@@ -20,7 +20,7 @@ export default function Signup({ onLoginClick }) {
 
     try {
       setLoading(true);
-      const res = await axios.post("http://localhost:5000/api/signup", {
+      const res = await axios.post("https://agrisense-17.onrender.com/api/signup", {
         name,
         phone,
         password,
