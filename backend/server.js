@@ -11,6 +11,15 @@ dotenv.config();
 
 const app = express();
 
+// ✅ Enhanced logging middleware
+app.use((req, res, next) => {
+  console.log(`🔍 [${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log("📦 Headers:", req.headers);
+  console.log("📦 Body:", req.body);
+  console.log("---");
+  next();
+});
+
 // ✅ Use both express and body-parser for full compatibility
 app.use(express.json());
 app.use(bodyParser.json());
@@ -20,26 +29,20 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(
   cors({
     origin: [
-      "https://agrisense-17f.vercel.app", // ✅ Your actual Vercel domain
-      "https://agrisense-frontend.vercel.app",
+      "https://agrisense-17f.vercel.app",
+      "https://agrisense-frontend.vercel.app", 
       "http://localhost:3000",
     ],
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
   })
 );
 
-// ✅ Debug log middleware
-app.use((req, res, next) => {
-  console.log(`🧾 [${req.method}] ${req.url}`);
-  console.log("📦 Body:", req.body);
-  next();
-});
+// ✅ Handle preflight OPTIONS requests
+app.options('*', cors());
 
 // ✅ MongoDB Connection (Atlas)
-const mongoUri =
-  process.env.MONGO_URI ||
-  "mongodb+srv://Agrisense:Agrisense%40123@agrisense.gxaxgcs.mongodb.net/agrisenseDB?retryWrites=true&w=majority";
+const mongoUri = process.env.MONGO_URI || "mongodb+srv://Agrisense:Agrisense%40123@agrisense.gxaxgcs.mongodb.net/agrisenseDB?retryWrites=true&w=majority";
 
 mongoose
   .connect(mongoUri, {
@@ -58,13 +61,9 @@ const client = twilio(accountSid, authToken);
 // ✅ Improved Phone formatter
 function formatPhone(phone) {
   if (!phone) return null;
-  
-  // Remove all non-digit characters
   let clean = String(phone).replace(/[^\d]/g, "");
-  
   console.log("📱 Raw phone input:", phone, "Cleaned:", clean);
   
-  // Handle different formats
   if (clean.startsWith("91") && clean.length === 12) return "+" + clean;
   if (/^[6-9]\d{9}$/.test(clean)) return "+91" + clean;
   if (clean.startsWith("+91") && clean.length === 13) return clean;
@@ -75,19 +74,33 @@ function formatPhone(phone) {
 
 // ✅ Root Route
 app.get("/", (req, res) => {
-  res.send("🚀 AgriSense Backend Active — Connected to Vercel Frontend!");
+  res.json({ 
+    message: "🚀 AgriSense Backend Active — Connected to Vercel Frontend!",
+    status: "running",
+    timestamp: new Date().toISOString()
+  });
 });
 
-app.get("home", (req, res) =>{
-  res.send("Welcome to AgriSense Home Page!");
-})
-
-// ✅ Test Route
-app.post("/api/test", (req, res) => {
-  console.log("✅ Test Route Body:", req.body);
+// ✅ TEST ROUTES - Enhanced with better logging
+app.get("/api/test", (req, res) => {
+  console.log("✅ GET /api/test accessed successfully");
   res.json({ 
-    message: "✅ Test route working!",
-    received: req.body 
+    success: true, 
+    message: "✅ GET Test route working!",
+    method: "GET",
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.post("/api/test", (req, res) => {
+  console.log("✅ POST /api/test accessed successfully");
+  console.log("📨 Request body:", req.body);
+  res.json({ 
+    success: true, 
+    message: "✅ POST Test route working!",
+    received: req.body,
+    method: "POST",
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -133,7 +146,6 @@ app.post("/api/login", async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Login error:", err.message);
-    console.error("❌ Full error stack:", err);
     res.status(500).json({ success: false, error: "Login failed - server error" });
   }
 });
@@ -247,7 +259,18 @@ app.post("/api/reset-password", async (req, res) => {
   }
 });
 
+// ✅ Catch-all route for undefined endpoints
+app.all("*", (req, res) => {
+  console.log(`❌ Route not found: ${req.method} ${req.url}`);
+  res.status(404).json({ 
+    success: false, 
+    error: `Route ${req.method} ${req.url} not found` 
+  });
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running successfully on port ${PORT}`);
+  console.log(`📍 Test GET: https://agrisense-17.onrender.com/api/test`);
+  console.log(`📍 Test POST: Use Postman to POST to https://agrisense-17.onrender.com/api/test`);
 });
