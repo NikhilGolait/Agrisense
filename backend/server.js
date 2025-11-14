@@ -2,43 +2,36 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import twilio from "twilio";
+import bodyParser from "body-parser";
+import User from "./models/User.js";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
-import User from "./models/User.js";
 
 dotenv.config();
 
 const app = express();
 
-// ✅ Proper JSON Parsing (Render requires this order)
-app.use(express.json({ limit: "1mb" }));
-app.use(express.urlencoded({ extended: true }));
+// ✅ Use both express and body-parser for full compatibility
+app.use(express.json());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// ✅ CORS Setup (supports both local + Vercel)
-const allowedOrigins = [
-  "https://agrisense17.vercel.app", // ⚙️ Your Vercel frontend domain
-  "http://localhost:3000", // For local testing
-];
-
+// ✅ FIXED CORS Configuration
 app.use(
   cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        console.log("❌ Blocked CORS from:", origin);
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
+    origin: [
+      "https://agrisense-17f.vercel.app", // ✅ Your actual Vercel domain
+      "https://agrisense-frontend.vercel.app",
+      "http://localhost:3000",
+    ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
 
-// ✅ Log every incoming request for debugging
+// ✅ Debug log middleware
 app.use((req, res, next) => {
-  console.log(`🧾 ${req.method} ${req.url}`);
-  console.log("📦 Headers:", req.headers);
+  console.log(`🧾 [${req.method}] ${req.url}`);
   console.log("📦 Body:", req.body);
   next();
 });
@@ -53,47 +46,108 @@ mongoose
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
-  .then(() => console.log("✅ MongoDB connected successfully"))
+  .then(() => console.log("✅ MongoDB Atlas connected successfully"))
   .catch((err) => console.error("❌ MongoDB connection error:", err.message));
 
-// ✅ Twilio Config
+// ✅ Twilio Setup
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
 const client = twilio(accountSid, authToken);
 
-// ✅ Helper: Normalize phone numbers
+// ✅ Improved Phone formatter
 function formatPhone(phone) {
   if (!phone) return null;
+  
+  // Remove all non-digit characters
   let clean = String(phone).replace(/[^\d]/g, "");
+  
+  console.log("📱 Raw phone input:", phone, "Cleaned:", clean);
+  
+  // Handle different formats
   if (clean.startsWith("91") && clean.length === 12) return "+" + clean;
   if (/^[6-9]\d{9}$/.test(clean)) return "+91" + clean;
-  if (phone.startsWith("+91") && phone.length === 13) return phone;
+  if (clean.startsWith("+91") && clean.length === 13) return clean;
+  
+  console.log("❌ Invalid phone format:", phone);
   return null;
 }
 
-// ✅ Root Test Route
+// ✅ Root Route
 app.get("/", (req, res) => {
-  res.send("🚀 AgriSense Backend Running (Connected to Vercel Frontend)");
+  res.send("🚀 AgriSense Backend Active — Connected to Vercel Frontend!");
 });
 
-// ✅ Debug Test Route (for body testing)
-app.post("/api/test-login", (req, res) => {
-  console.log("✅ /api/test-login Body:", req.body);
-  res.json({ received: req.body });
+app.get("home", (req, res) =>{
+  res.send("Welcome to AgriSense Home Page!");
+})
+
+// ✅ Test Route
+app.post("/api/test", (req, res) => {
+  console.log("✅ Test Route Body:", req.body);
+  res.json({ 
+    message: "✅ Test route working!",
+    received: req.body 
+  });
 });
 
-// ✅ Send SMS Route
+// ✅ Enhanced Login Route with better error handling
+app.post("/api/login", async (req, res) => {
+  try {
+    console.log("📥 Login Request Body:", req.body);
+    const { phone, password } = req.body;
+    
+    if (!phone || !password) {
+      console.log("❌ Missing phone or password");
+      return res.status(400).json({ success: false, error: "Phone and password required" });
+    }
+
+    const formatted = formatPhone(phone);
+    console.log("📱 Formatted phone:", formatted);
+    
+    if (!formatted) {
+      return res.status(400).json({ success: false, error: "Invalid phone number format" });
+    }
+
+    const storedPhone = formatted.replace("+91", "");
+    console.log("💾 Searching for user with phone:", storedPhone);
+    
+    const user = await User.findOne({ phone: storedPhone });
+    if (!user) {
+      console.log("❌ User not found for phone:", storedPhone);
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    console.log("✅ User found, checking password...");
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      console.log("❌ Password mismatch");
+      return res.status(401).json({ success: false, error: "Incorrect password" });
+    }
+
+    console.log("✅ Login successful for user:", user.name);
+    res.json({
+      success: true,
+      message: "Login successful",
+      user: { id: user._id, name: user.name, phone: user.phone },
+    });
+  } catch (err) {
+    console.error("❌ Login error:", err.message);
+    console.error("❌ Full error stack:", err);
+    res.status(500).json({ success: false, error: "Login failed - server error" });
+  }
+});
+
+// ✅ Send SMS
 app.post("/api/send-sms", async (req, res) => {
   try {
     const { phone, message, cropInfo } = req.body;
     const smsBody = message || cropInfo;
 
     if (!phone || !smsBody) {
-      return res.status(400).json({
-        success: false,
-        error: "Phone number and message/cropInfo required",
-      });
+      return res
+        .status(400)
+        .json({ success: false, error: "Phone number and message/cropInfo required" });
     }
 
     const formattedPhone = formatPhone(phone);
@@ -119,26 +173,30 @@ app.post("/api/send-sms", async (req, res) => {
       body: safeBody,
     });
 
-    console.log("✅ Twilio SMS Sent:", sms.sid);
+    console.log("✅ Twilio SMS sent:", sms.sid);
     res.json({ success: true, message: "✅ SMS sent successfully!" });
   } catch (err) {
     console.error("❌ SMS send failed:", err.message);
-    res.status(500).json({ success: false, error: "SMS send failed" });
+    let reason = err.message;
+
+    if (reason.includes("unverified"))
+      reason =
+        "Your Twilio account is in trial mode — please verify this number in Twilio console.";
+    else if (reason.includes("Permission"))
+      reason = "Twilio permission denied for sending to this destination.";
+    else if (reason.includes("From"))
+      reason = "The Twilio number is not SMS-capable.";
+
+    res.status(500).json({ success: false, error: reason });
   }
 });
 
 // ✅ Signup Route
 app.post("/api/signup", async (req, res) => {
   try {
-    console.log("📥 Signup Request:", req.body);
     const { name, phone, password } = req.body;
-
-    if (!name || !phone || !password) {
-      return res.status(400).json({
-        success: false,
-        error: "Name, phone, and password required",
-      });
-    }
+    if (!name || !phone || !password)
+      return res.status(400).json({ success: false, error: "Name, phone and password required" });
 
     const formatted = formatPhone(phone);
     if (!formatted)
@@ -151,7 +209,6 @@ app.post("/api/signup", async (req, res) => {
 
     const hashed = await bcrypt.hash(password, 10);
     const user = await User.create({ name, phone: storedPhone, password: hashed });
-
     res.json({
       success: true,
       message: "User created",
@@ -163,50 +220,14 @@ app.post("/api/signup", async (req, res) => {
   }
 });
 
-// ✅ Login Route
-app.post("/api/login", async (req, res) => {
-  try {
-    console.log("📥 Login Request:", req.body);
-
-    const { phone, password } = req.body;
-    if (!phone || !password)
-      return res
-        .status(400)
-        .json({ success: false, error: "Phone and password required" });
-
-    const formatted = formatPhone(phone);
-    if (!formatted)
-      return res.status(400).json({ success: false, error: "Invalid phone number" });
-
-    const storedPhone = formatted.replace("+91", "");
-    const user = await User.findOne({ phone: storedPhone });
-    if (!user)
-      return res.status(404).json({ success: false, error: "User not found" });
-
-    const match = await bcrypt.compare(password, user.password);
-    if (!match)
-      return res.status(401).json({ success: false, error: "Incorrect password" });
-
-    res.json({
-      success: true,
-      message: "Login successful",
-      user: { id: user._id, name: user.name, phone: user.phone },
-    });
-  } catch (err) {
-    console.error("❌ Login error:", err.message);
-    res.status(500).json({ success: false, error: "Login failed" });
-  }
-});
-
-// ✅ Reset Password
+// ✅ Reset Password Route
 app.post("/api/reset-password", async (req, res) => {
   try {
     const { phone, newPassword } = req.body;
     if (!phone || !newPassword)
-      return res.status(400).json({
-        success: false,
-        error: "Phone and new password required",
-      });
+      return res
+        .status(400)
+        .json({ success: false, error: "Phone and new password required" });
 
     const formatted = formatPhone(phone);
     if (!formatted)
@@ -226,7 +247,6 @@ app.post("/api/reset-password", async (req, res) => {
   }
 });
 
-// ✅ Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running successfully on port ${PORT}`);
